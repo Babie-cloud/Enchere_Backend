@@ -5,17 +5,17 @@ from rest_framework.routers import DefaultRouter
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 
-# Nos ViewSets
+# Import de tes ViewSets
 from produits.api.views import ProduitViewSet, CategorieViewSet
 from commandes.api.views import PanierViewSet
 
-# Router
+# Configuration du router DRF
 router = DefaultRouter()
 router.register(r'api/produits', ProduitViewSet, basename='produit')
 router.register(r'api/categories', CategorieViewSet, basename='categorie')
 router.register(r'api/panier', PanierViewSet, basename='panier')
 
-# Vue racine API – on évite les reverse sur noms internes Djoser
+# Vue racine de l'API (pour la documentation / découverte)
 @api_view(['GET'])
 def api_root(request, format=None):
     return Response({
@@ -23,26 +23,30 @@ def api_root(request, format=None):
         'catégories': request.build_absolute_uri('/api/categories/'),
         'panier': request.build_absolute_uri('/api/panier/'),
         'inscription': request.build_absolute_uri('/api/auth/users/'),
-        'connexion (JWT)': request.build_absolute_uri('/api/auth/jwt/create/'),
-        # 'connexion (JWT)': 'POST /api/auth/jwt/create/',
+        'connexion JWT': request.build_absolute_uri('/api/auth/jwt/create/'),
         'rafraîchir token': request.build_absolute_uri('/api/auth/jwt/refresh/'),
-        'profil & suppression compte': request.build_absolute_uri('/api/auth/users/me/'),
-        'demander reset mot de passe': request.build_absolute_uri('/api/auth/users/reset_password/'),
-        'confirmer reset mot de passe': request.build_absolute_uri('/api/auth/users/reset_password_confirm/'),
+        'vérifier token': request.build_absolute_uri('/api/auth/jwt/verify/'),
+        'profil utilisateur': request.build_absolute_uri('/api/auth/users/me/'),
+        'reset mot de passe': request.build_absolute_uri('/api/auth/users/reset_password/'),
+        'reset mot de passe confirm': request.build_absolute_uri('/api/auth/users/reset_password_confirm/'),
     })
 
 urlpatterns = [
-    # Admin
+    # Admin Django
     path('admin/', admin.site.urls),
 
-    # Racine API belle et stable
+    # Racine API (documentation)
     path('', api_root, name='api-root'),
 
-    # Routes automatiques du router
+    # Authentification Djoser (users/, me/, reset_password/, activation, etc.)
+    path('api/auth/', include('djoser.urls')),
+
+    # Authentification JWT (create, refresh, verify)
+    path('api/auth/jwt/', include('djoser.urls.jwt')),
+
+    # Routes DRF router (produits, catégories, panier)
     path('', include(router.urls)),
 
-    # Djoser – Auth complète
-    path('api/auth/', include('djoser.urls')),          # reset password, activation, etc.
-    path('api/auth/', include('djoser.urls.jwt')),      # JWT login, refresh, verify
+    # Si tu ajoutes d'autres apps ou vues plus tard, mets-les ici
+    # path('api/autre-chose/', include('autre_app.urls')),
 ]
-
