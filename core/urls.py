@@ -25,10 +25,7 @@ def api_root(request, format=None):
         'inscription': request.build_absolute_uri('/api/auth/users/'),
         'connexion JWT': request.build_absolute_uri('/api/auth/jwt/create/'),
         'rafraîchir token': request.build_absolute_uri('/api/auth/jwt/refresh/'),
-        'vérifier token': request.build_absolute_uri('/api/auth/jwt/verify/'),
-        'profil utilisateur': request.build_absolute_uri('/api/auth/users/me/'),
-        'reset mot de passe': request.build_absolute_uri('/api/auth/users/reset_password/'),
-        'reset mot de passe confirm': request.build_absolute_uri('/api/auth/users/reset_password_confirm/'),
+        'profil': request.build_absolute_uri('/api/auth/users/me/'),
     })
 
 urlpatterns = [
@@ -38,15 +35,34 @@ urlpatterns = [
     # Racine API (documentation)
     path('', api_root, name='api-root'),
 
-    # Authentification Djoser (users/, me/, reset_password/, activation, etc.)
+    # Authentification Djoser (users/, me/, reset_password/, etc.)
     path('api/auth/', include('djoser.urls')),
 
+    # # Authentification JWT → on enlève le /jwt/ du préfixe pour éviter le double
+    path('api/auth/', include('djoser.urls.jwt')),   # ← CHANGEMENT ICI
+
     # Authentification JWT (create, refresh, verify)
-    path('api/auth/jwt/', include('djoser.urls.jwt')),
+    # path('api/auth/jwt/', include('djoser.urls.jwt')),
 
     # Routes DRF router (produits, catégories, panier)
     path('', include(router.urls)),
-
-    # Si tu ajoutes d'autres apps ou vues plus tard, mets-les ici
-    # path('api/autre-chose/', include('autre_app.urls')),
 ]
+
+#     # Admin Django
+#     path('admin/', admin.site.urls),
+
+#     # Racine API (documentation)
+#     path('', api_root, name='api-root'),
+
+#     # Authentification Djoser (users/, me/, reset_password/, activation, etc.)
+#     path('api/auth/', include('djoser.urls')),
+
+#     # Authentification JWT (create, refresh, verify)
+#     path('api/auth/jwt/', include('djoser.urls.jwt')),
+
+#     # Routes DRF router (produits, catégories, panier)
+#     path('', include(router.urls)),
+
+#     # Si tu ajoutes d'autres apps ou vues plus tard, mets-les ici
+#     # path('api/autre-chose/', include('autre_app.urls')),
+# ]
