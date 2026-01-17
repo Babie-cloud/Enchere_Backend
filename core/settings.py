@@ -57,8 +57,6 @@ TEMPLATES = [
         'OPTIONS': {
             'context_processors': [
                 'django.template.context_processors.request',
-                # 'django.contrib.auth',
-                # 'django.contrib.messages',
                 'django.template.context_processors.debug',
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',     # ← Obligatoire pour l'admin
@@ -140,21 +138,16 @@ CORS_ALLOWED_ORIGINS = [
 
 # ==================== EMAIL CONFIG ====================
 
-# Active le backend SMTP réel pour Mailtrap
-# EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
-# EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
+EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'  # Décommenté : SMTP réel pour Mailtrap
+# EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'  # Si tu veux tester en console
 
-# EMAIL_HOST = 'smtp.mailtrap.io'  # Ou send.smtp.mailtrap.io selon ce qu'ils te donnent
-# EMAIL_PORT = 2525                # Ou 587
-# EMAIL_HOST_USER = 'ton_vrai_username_mailtrap'     # ← Colle le vrai ici !
-# EMAIL_HOST_PASSWORD = 'ton_vrai_password_mailtrap'  # ← Colle le vrai ici !
-# EMAIL_USE_TLS = True             # Important pour la sécurité
+EMAIL_HOST = 'smtp.mailtrap.io'  # Ou send.smtp.mailtrap.io selon ce qu'ils te donnent
+EMAIL_PORT = 2525                # Ou 587
+EMAIL_HOST_USER = 'ton_vrai_username_mailtrap'     # ← Colle le vrai ici !
+EMAIL_HOST_PASSWORD = 'ton_vrai_password_mailtrap'  # ← Colle le vrai ici !
+EMAIL_USE_TLS = True             # Important pour la sécurité
 
-# # DEFAULT_FROM_EMAIL = 'DirectAlu <no-reply@directalu.com>'
-
-# DEFAULT_FROM_EMAIL = 'DirectAlu <no-reply@directalu.com>'
-
-# DEFAULT_FROM_EMAIL = 'DirectAlu <no-reply@directalu.com>'
+DEFAULT_FROM_EMAIL = 'DirectAlu <no-reply@directalu.com>'  # Nettoyé : une seule ligne
 
 # ==================== DJOSER CONFIG ====================
 
@@ -163,8 +156,7 @@ DJOSER = {
     'USER_CREATE_PASSWORD_RETYPE': True,
     'USERNAME_CHANGED_EMAIL_CONFIRMATION': True,
     'PASSWORD_CHANGED_EMAIL_CONFIRMATION': True,
-    # 'SEND_CONFIRMATION_EMAIL': False,
-    # 'USER_CREATE_PASSWORD_RETYPE': False,
+    'SEND_CONFIRMATION_EMAIL': True,  # Changé à True pour activer emails (était False)
     'SET_PASSWORD_RETYPE': True,
     'SET_USERNAME_RETYPE': True,
     'PASSWORD_RESET_CONFIRM_URL': 'password/reset/confirm/{uid}/{token}',
