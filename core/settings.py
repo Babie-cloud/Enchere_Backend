@@ -58,8 +58,7 @@ TEMPLATES = [
             'context_processors': [
                 'django.template.context_processors.request',
                 'django.template.context_processors.debug',
-                'django.template.context_processors.request',
-                'django.contrib.auth.context_processors.auth',     # ← Obligatoire pour l'admin
+                'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
             ],
         },
@@ -82,38 +81,15 @@ AUTH_PASSWORD_VALIDATORS = [
     {'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator'},
 ]
 
-# LANGUAGE_CODE = 'fr'
-# TIME_ZONE = 'UTC'
-# USE_I18N = True
-# USE_TZ = True
-
-# LANGUAGES = [
-#     ('fr', 'Français'),
-#     ('en', 'English'),
-#     ('es', 'Español'),
-#     ('nl', 'Nederlands'),
-# ]
-
-# PARLER_LANGUAGES = {
-#     None: (
-#         {'code': 'fr'},
-#         {'code': 'en'},
-#         {'code': 'es'},
-#         {'code': 'nl'},
-#     ),
-#     'default': {
-#         'fallback': 'fr',
-#         'hide_untranslated': False,
-#     }
-# }
-
 STATIC_URL = 'static/'
 
 AUTH_USER_MODEL = 'users.Utilisateur'
 
+# ==================== REST FRAMEWORK CONFIG ====================
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
         'rest_framework_simplejwt.authentication.JWTAuthentication',
+        'rest_framework.authentication.SessionAuthentication',  # Ajouté pour permettre le login via navigateur
     ),
     'DEFAULT_PERMISSION_CLASSES': [
         'rest_framework.permissions.IsAuthenticated',
@@ -137,32 +113,27 @@ CORS_ALLOWED_ORIGINS = [
 ]
 
 # ==================== EMAIL CONFIG ====================
-
-EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'  # Décommenté : SMTP réel pour Mailtrap
-# EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'  # Si tu veux tester en console
-
-EMAIL_HOST = 'smtp.mailtrap.io'  # Ou send.smtp.mailtrap.io selon ce qu'ils te donnent
-EMAIL_PORT = 2525                # Ou 587
-EMAIL_HOST_USER = 'ton_vrai_username_mailtrap'     # ← Colle le vrai ici !
-EMAIL_HOST_PASSWORD = 'ton_vrai_password_mailtrap'  # ← Colle le vrai ici !
-EMAIL_USE_TLS = True             # Important pour la sécurité
-
-DEFAULT_FROM_EMAIL = 'DirectAlu <no-reply@directalu.com>'  # Nettoyé : une seule ligne
+EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+EMAIL_HOST = 'smtp.mailtrap.io'
+EMAIL_PORT = 2525
+EMAIL_HOST_USER = 'ton_vrai_username_mailtrap'
+EMAIL_HOST_PASSWORD = 'ton_vrai_password_mailtrap'
+EMAIL_USE_TLS = True
+DEFAULT_FROM_EMAIL = 'DirectAlu <no-reply@directalu.com>'
 
 # ==================== DJOSER CONFIG ====================
-
 DJOSER = {
     'LOGIN_FIELD': 'email',
     'USER_CREATE_PASSWORD_RETYPE': True,
     'USERNAME_CHANGED_EMAIL_CONFIRMATION': True,
     'PASSWORD_CHANGED_EMAIL_CONFIRMATION': True,
-    'SEND_CONFIRMATION_EMAIL': True,  # Changé à True pour activer emails (était False)
+    'SEND_CONFIRMATION_EMAIL': True,
     'SET_PASSWORD_RETYPE': True,
     'SET_USERNAME_RETYPE': True,
     'PASSWORD_RESET_CONFIRM_URL': 'password/reset/confirm/{uid}/{token}',
     'USERNAME_RESET_CONFIRM_URL': 'email/reset/confirm/{uid}/{token}',
     'ACTIVATION_URL': 'activate/{uid}/{token}',
-    'SEND_ACTIVATION_EMAIL': False,  # Désactivé car tu gères l'activation via statut
+    'SEND_ACTIVATION_EMAIL': False,
     'SERIALIZERS': {
         'user_create': 'users.api.serializers.RegisterSerializer',
         'user': 'users.api.serializers.UserSerializer',
@@ -170,3 +141,15 @@ DJOSER = {
         'token_create': 'users.api.serializers.CustomTokenObtainPairSerializer',
     },
 }
+
+# ==================== REDIRECTIONS & AUTH ====================
+# Redirige l'utilisateur vers la liste des produits après la connexion
+LOGIN_REDIRECT_URL = '/api/produits/'
+
+# Redirige vers la racine après la déconnexion
+LOGOUT_REDIRECT_URL = '/'
+
+# URL utilisée par Django pour le login (interface DRF)
+LOGIN_URL = '/api-auth/login/'
+
+DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'

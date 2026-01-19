@@ -23,6 +23,7 @@ class PanierItemSerializer(serializers.ModelSerializer):
         return obj.subtotal()
 
 
+# Dans commandes/api/serializers.py
 class PanierSerializer(serializers.ModelSerializer):
     items = PanierItemSerializer(many=True, read_only=True)
     total = serializers.SerializerMethodField()
@@ -32,4 +33,5 @@ class PanierSerializer(serializers.ModelSerializer):
         fields = ['id', 'items', 'total']
 
     def get_total(self, obj):
+        # Utilise la relation 'items' définie dans le modèle PanierItem
         return sum(item.subtotal() for item in obj.items.all())
