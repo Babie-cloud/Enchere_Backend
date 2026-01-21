@@ -55,7 +55,7 @@ class Produit(TranslatableModel):
         max_digits=10, decimal_places=3, null=True, blank=True,
         help_text="Volume en m³", verbose_name="Volume"
     )
-    approuve = models.BooleanField(default=False, verbose_name="Approuvé")
+    approuve = models.BooleanField(default=True, verbose_name="Approuvé")
     date_creation = models.DateTimeField(auto_now_add=True, verbose_name="Date de création")
 
     # Champs traduits
