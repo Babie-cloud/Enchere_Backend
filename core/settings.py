@@ -11,7 +11,7 @@ SECRET_KEY = 'django-insecure-m_ciku%59ulq@+-r602n6$e5iw#(=+8@0d0++qp3l6pun5yje2
 
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['*']               # ← ajouté pour dev (localhost, 127.0.0.1, etc.)
 
 INSTALLED_APPS = [
     'django.contrib.admin',
@@ -37,7 +37,7 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
-    'corsheaders.middleware.CorsMiddleware',
+    'corsheaders.middleware.CorsMiddleware',          # doit rester en haut
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -89,13 +89,18 @@ AUTH_USER_MODEL = 'users.Utilisateur'
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
         'rest_framework_simplejwt.authentication.JWTAuthentication',
-        'rest_framework.authentication.SessionAuthentication',  # Ajouté pour permettre le login via navigateur
+        'rest_framework.authentication.SessionAuthentication',
     ),
     'DEFAULT_PERMISSION_CLASSES': [
         'rest_framework.permissions.IsAuthenticated',
     ],
+    'DEFAULT_RENDERER_CLASSES': (
+        'rest_framework.renderers.JSONRenderer',
+        'rest_framework.renderers.BrowsableAPIRenderer',   # ← utile pour debug dans navigateur
+    ),
 }
 
+# En DEBUG → on assouplit les permissions globales (mais pas sur les vues sensibles)
 if DEBUG:
     REST_FRAMEWORK['DEFAULT_PERMISSION_CLASSES'] = [
         'rest_framework.permissions.AllowAny',
@@ -105,11 +110,22 @@ SIMPLE_JWT = {
     'ACCESS_TOKEN_LIFETIME': timedelta(minutes=60),
     'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
     'ROTATE_REFRESH_TOKENS': True,
+    'BLACKLIST_AFTER_ROTATION': True,           # ← bonne pratique
 }
 
+# CORS – configuration plus permissive pour le dev (à restreindre en prod !)
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:4200",
     "http://127.0.0.1:4200",
+]
+
+CORS_ALLOW_CREDENTIALS = True                       # ← important si tu utilises cookies/session
+CORS_ALLOW_HEADERS = [                              # ← autorise le header Authorization
+    "accept",
+    "authorization",
+    "content-type",
+    "x-csrftoken",
+    "x-requested-with",
 ]
 
 # ==================== EMAIL CONFIG ====================
@@ -143,13 +159,8 @@ DJOSER = {
 }
 
 # ==================== REDIRECTIONS & AUTH ====================
-# Redirige l'utilisateur vers la liste des produits après la connexion
 LOGIN_REDIRECT_URL = '/api/produits/'
-
-# Redirige vers la racine après la déconnexion
 LOGOUT_REDIRECT_URL = '/'
-
-# URL utilisée par Django pour le login (interface DRF)
 LOGIN_URL = '/api-auth/login/'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'

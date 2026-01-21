@@ -1,3 +1,4 @@
+# produits/models.py
 from django.db import models
 from parler.models import TranslatableModel, TranslatedFields
 from users.models import Utilisateur

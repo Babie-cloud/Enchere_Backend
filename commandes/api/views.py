@@ -1,5 +1,6 @@
 # commandes/api/views.py
 import uuid
+from django.db import transaction
 from rest_framework import viewsets, permissions, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -7,62 +8,48 @@ from rest_framework.exceptions import ValidationError
 from django.shortcuts import get_object_or_404
 
 from produits.models import Produit
-from ..models import Panier, PanierItem 
-from .serializers import PanierSerializer, PanierItemSerializer
+from ..models import Panier, PanierItem, Commande, LigneCommande
+# Ajoute CommandeSerializer ici (nous allons le créer juste après)
+from .serializers import PanierSerializer, PanierItemSerializer, CommandeSerializer
 
 class PanierViewSet(viewsets.ModelViewSet):
     """
-    ViewSet pour gérer le panier de l'utilisateur connecté.
+    ViewSet pour gérer le panier et passer commande.
     """
     serializer_class = PanierSerializer
     permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
-        # Retourne uniquement le panier de l'utilisateur connecté
         return Panier.objects.filter(utilisateur=self.request.user)
 
     def get_object(self):
-        """
-        Récupère le panier de l'utilisateur. 
-        Si aucun panier n'existe, en crée un avec une clé unique (UUID).
-        """
+        """Récupère ou crée le panier de l'utilisateur avec une clé unique."""
         user = self.request.user
-        
-        # 1. On cherche si un panier existe déjà pour cet utilisateur
         panier = Panier.objects.filter(utilisateur=user).first()
         
         if not panier:
-            # 2. Si non, on le crée. On génère un UUID pour la session_key 
-            # afin d'éviter les erreurs d'unicité (IntegrityError).
             unique_key = str(uuid.uuid4())[:40]
             panier = Panier.objects.create(
                 utilisateur=user,
                 session_key=unique_key
             )
-            
         return panier
 
     def create(self, request, *args, **kwargs):
-        """
-        Redéfinition du POST sur /api/panier/
-        Renvoie le panier existant au lieu de tenter une création aveugle.
-        """
+        """Évite l'erreur d'unicité sur le POST racine."""
         panier = self.get_object()
         serializer = self.get_serializer(panier)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
     @action(detail=False, methods=['get'])
     def my_cart(self, request):
-        """URL: /api/panier/my_cart/"""
         panier = self.get_object()
         serializer = self.get_serializer(panier)
         return Response(serializer.data)
 
     @action(detail=False, methods=['post'], url_path='ajouter')
     def ajouter(self, request):
-        """URL: /api/panier/ajouter/"""
         produit_id = request.data.get('produit_id')
-        
         try:
             quantite = int(request.data.get('quantite', 1))
         except (ValueError, TypeError):
@@ -71,11 +58,10 @@ class PanierViewSet(viewsets.ModelViewSet):
         if quantite < 1:
             raise ValidationError("La quantité doit être positive.")
 
-        # On vérifie que le produit existe et est approuvé
+        # On vérifie que le produit est approuvé (le fameux bouton vert !)
         produit = get_object_or_404(Produit, id=produit_id, approuve=True)
         panier = self.get_object()
 
-        # Ajout ou mise à jour de l'article dans le panier
         item, created = PanierItem.objects.get_or_create(
             panier=panier,
             produit=produit,
@@ -89,38 +75,52 @@ class PanierViewSet(viewsets.ModelViewSet):
         serializer = PanierSerializer(panier)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
-    @action(detail=False, methods=['patch'], url_path='items/(?P<item_id>\\d+)')
-    def modifier_item(self, request, item_id=None):
-        """URL: /api/panier/items/{id}/ (PATCH)"""
+    @action(detail=False, methods=['post'], url_path='valider-commande')
+    def passer_commande(self, request):
+        """
+        Transforme le panier en commande et vide le panier.
+        """
         panier = self.get_object()
-        item = get_object_or_404(PanierItem, id=item_id, panier=panier)
-        quantite = request.data.get('quantite')
+        items = panier.items.all()
 
-        if quantite is not None:
-            try:
-                q = int(quantite)
-                if q < 1:
-                    item.delete()
-                else:
-                    item.quantite = q
-                    item.save()
-            except ValueError:
-                raise ValidationError("Quantité invalide.")
+        if not items.exists():
+            return Response({"error": "Le panier est vide"}, status=status.HTTP_400_BAD_REQUEST)
 
-        serializer = PanierSerializer(panier)
-        return Response(serializer.data)
+        with transaction.atomic():
+            commande = Commande.objects.create(
+                client=request.user,
+                payee=False
+            )
 
-    @action(detail=False, methods=['delete'], url_path='items/(?P<item_id>\\d+)')
-    def supprimer_item(self, request, item_id=None):
-        """URL: /api/panier/items/{id}/ (DELETE)"""
-        panier = self.get_object()
-        item = get_object_or_404(PanierItem, id=item_id, panier=panier)
-        item.delete()
-        return Response(status=status.HTTP_204_NO_CONTENT)
+            for item in items:
+                LigneCommande.objects.create(
+                    commande=commande,
+                    produit=item.produit,
+                    quantite=item.quantite,
+                    prix_unitaire=item.produit.prix
+                )
+
+            items.delete()
+
+        return Response({
+            "message": "Commande créée avec succès",
+            "commande_id": commande.id
+        }, status=status.HTTP_201_CREATED)
 
     @action(detail=False, methods=['delete'], url_path='vider')
     def vider(self, request):
-        """URL: /api/panier/vider/"""
         panier = self.get_object()
         panier.items.all().delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class CommandeViewSet(viewsets.ReadOnlyModelViewSet):
+    """
+    ViewSet pour consulter l'historique des commandes passées.
+    """
+    serializer_class = CommandeSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        # L'utilisateur ne voit que ses propres commandes
+        return Commande.objects.filter(client=self.request.user).order_by('-date_commande')

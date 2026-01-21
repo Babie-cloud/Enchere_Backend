@@ -1,14 +1,15 @@
+# produits/api/views.py
 from rest_framework import viewsets, permissions, filters
 from rest_framework.exceptions import PermissionDenied
+from rest_framework.decorators import action
+from rest_framework.response import Response
 from ..models import Produit, Categorie
 from .serializers import ProduitSerializer, CategorieSerializer
-
 
 class CategorieViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = Categorie.objects.all()
     serializer_class = CategorieSerializer
-    permission_classes = [permissions.AllowAny]  # Tout le monde peut lire les catégories
-
+    permission_classes = [permissions.AllowAny]
 
 class ProduitViewSet(viewsets.ModelViewSet):
     queryset = Produit.objects.select_related('vendeur', 'categorie')
@@ -20,31 +21,28 @@ class ProduitViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         user = self.request.user
-        # Si connecté et admin → tout voir
         if user.is_authenticated and getattr(user, 'role', None) == 'ADMIN':
-            return Produit.objects.all()
-        # Sinon → seulement les produits approuvés (public)
-        return Produit.objects.filter(approuve=True)
+            return Produit.objects.all()  # Admin voit tout
+        elif user.is_authenticated and getattr(user, 'role', None) == 'VENDEUR':
+            return Produit.objects.filter(vendeur=user)  # Vendeur voit seulement les siens
+        else:
+            return Produit.objects.filter(approuve=True)  # Public voit seulement approuvés
 
     def perform_create(self, serializer):
         user = self.request.user
-
-        # 1. Utilisateur non connecté → interdit
         if not user.is_authenticated:
-            raise PermissionDenied("Vous devez être connecté pour ajouter un produit.")
-
-        # 2. Vérification du rôle avec getattr pour éviter AttributeError
+            raise PermissionDenied("Vous devez être connecté.")
         user_role = getattr(user, 'role', None)
+        if user_role not in ['VENDEUR', 'ADMIN']:
+            raise PermissionDenied("Seuls les vendeurs ou admins peuvent ajouter des produits.")
+        if user_role == 'VENDEUR' and getattr(user, 'statut', None) != 'APPROVED':
+            raise PermissionDenied("Votre compte vendeur est en attente.")
+        serializer.save(vendeur=user)
 
-        if user_role == 'VENDEUR':
-            # Optionnel : vérification que le vendeur est approuvé
-            user_statut = getattr(user, 'statut', None)
-            if user_statut != 'APPROVED':
-                raise PermissionDenied("Votre compte vendeur est en attente de validation.")
-            serializer.save(vendeur=user)
-        elif user_role == 'ADMIN':
-            # Les admins peuvent aussi créer des produits si tu veux
-            serializer.save(vendeur=user)  # ou sans vendeur si tu préfères
-        else:
-            # Autres rôles ou aucun rôle → interdit
-            raise PermissionDenied("Seuls les vendeurs approuvés peuvent ajouter des produits.")
+    # Nouvelle action : approuver un produit (seulement pour admins)
+    @action(detail=True, methods=['post'], permission_classes=[permissions.IsAdminUser])
+    def approve(self, request, pk=None):
+        produit = self.get_object()
+        produit.approuve = True
+        produit.save()
+        return Response({'detail': f'Produit {produit} approuvé avec succès.'})
