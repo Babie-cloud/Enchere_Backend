@@ -5,6 +5,7 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from ..models import Produit, Categorie
 from .serializers import ProduitSerializer, CategorieSerializer
+from rest_framework.permissions import IsAuthenticated, IsAdminUser
 
 class CategorieViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = Categorie.objects.all()
@@ -12,12 +13,19 @@ class CategorieViewSet(viewsets.ReadOnlyModelViewSet):
     permission_classes = [permissions.AllowAny]
 
 class ProduitViewSet(viewsets.ModelViewSet):
-    queryset = Produit.objects.select_related('vendeur', 'categorie')
-    serializer_class = ProduitSerializer
+    queryset = Produit.objects.all().select_related('vendeur', 'categorie').prefetch_related('translations', 'images', 'variantes')
+    serializer_class = ProduitSerializer  # celui qu’on a corrigé avant
+    permission_classes = [IsAuthenticated]  # ou [IsAdminUser] si tu veux restreindre
     filter_backends = [filters.SearchFilter, filters.OrderingFilter]
     search_fields = ['translations__titre', 'translations__description']
     ordering_fields = ['prix', 'date_creation']
     ordering = ['-date_creation']
+
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+        # Option 1 : TOUJOURS montrer TOUS les produits (simple pour ton dashboard)
+        return qs
 
     def get_queryset(self):
         user = self.request.user
