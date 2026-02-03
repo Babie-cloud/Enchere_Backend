@@ -7,11 +7,17 @@ from ..models import Produit, Categorie
 from .serializers import ProduitSerializer, CategorieSerializer
 from rest_framework.permissions import IsAuthenticated, IsAdminUser
 
-class CategorieViewSet(viewsets.ReadOnlyModelViewSet):
+class CategorieViewSet(viewsets.ModelViewSet):
     queryset = Categorie.objects.all()
     serializer_class = CategorieSerializer
     permission_classes = [permissions.AllowAny]
 
+def perform_create(self, serializer):
+        # Option : vérifie si user est admin
+        if not self.request.user.is_staff:
+            raise PermissionDenied("Seuls les admins peuvent ajouter des catégories.")
+        serializer.save()
+        
 class ProduitViewSet(viewsets.ModelViewSet):
     queryset = Produit.objects.all().select_related('vendeur', 'categorie').prefetch_related('translations', 'images', 'variantes')
     serializer_class = ProduitSerializer  # celui qu’on a corrigé avant
