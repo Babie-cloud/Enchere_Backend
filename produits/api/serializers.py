@@ -15,10 +15,22 @@ class DecimalFlexibleField(serializers.DecimalField):
 
 
 class ProductImageSerializer(serializers.ModelSerializer):
+    """
+    IMPORTANT : on renvoie TOUJOURS une URL absolue
+    """
+    image = serializers.SerializerMethodField()
+
     class Meta:
         model = ProductImage
         fields = ['id', 'image', 'alt_text', 'ordre']
         read_only_fields = ['id']
+
+    def get_image(self, obj):
+        request = self.context.get('request')
+        if obj.image and hasattr(obj.image, 'url'):
+            # Renvoie une URL absolue[](http://localhost:8000/media/...)
+            return request.build_absolute_uri(obj.image.url) if request else obj.image.url
+        return None
 
 
 class ProductVariantSerializer(serializers.ModelSerializer):
@@ -49,6 +61,7 @@ class ProduitSerializer(serializers.ModelSerializer):
         allow_null=True
     )
 
+    # On utilise le serializer qui renvoie les URLs absolues
     images = ProductImageSerializer(many=True, read_only=True)
     variantes = ProductVariantSerializer(many=True, read_only=True)
 
@@ -118,7 +131,7 @@ class ProduitSerializer(serializers.ModelSerializer):
         instance = super().update(instance, validated_data)
 
         # Si on envoie de nouvelles images ou métadonnées → on remplace tout
-        if images_files or images_meta_json:
+        if images_files or images_meta_json is not None:
             instance.images.all().delete()  # suppression complète
 
             if images_meta_json:
@@ -135,7 +148,5 @@ class ProduitSerializer(serializers.ModelSerializer):
                             alt_text=meta.get('alt_text', ''),
                             ordre=meta.get('ordre', idx)
                         )
-                    # Option : si on veut conserver des anciennes images non remplacées,
-                    # on peut ajouter une logique avec meta.get('id') ici
 
         return instance
