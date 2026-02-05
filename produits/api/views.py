@@ -1,62 +1,55 @@
-# produits/api/views.py
 from rest_framework import viewsets, permissions, filters
 from rest_framework.exceptions import PermissionDenied
 from rest_framework.decorators import action
 from rest_framework.response import Response
+
 from ..models import Produit, Categorie
 from .serializers import ProduitSerializer, CategorieSerializer
-from rest_framework.permissions import IsAuthenticated, IsAdminUser
+
 
 class CategorieViewSet(viewsets.ModelViewSet):
     queryset = Categorie.objects.all()
     serializer_class = CategorieSerializer
     permission_classes = [permissions.AllowAny]
 
-def perform_create(self, serializer):
-        # Option : vérifie si user est admin
+    def perform_create(self, serializer):
         if not self.request.user.is_staff:
             raise PermissionDenied("Seuls les admins peuvent ajouter des catégories.")
         serializer.save()
-        
+
+
 class ProduitViewSet(viewsets.ModelViewSet):
-    queryset = Produit.objects.all().select_related('vendeur', 'categorie').prefetch_related('translations', 'images', 'variantes')
-    serializer_class = ProduitSerializer  # celui qu’on a corrigé avant
-    permission_classes = [IsAuthenticated]  # ou [IsAdminUser] si tu veux restreindre
+    serializer_class = ProduitSerializer
+    permission_classes = [permissions.IsAuthenticated]
     filter_backends = [filters.SearchFilter, filters.OrderingFilter]
-    search_fields = ['translations__titre', 'translations__description']
+    search_fields = ['titre', 'description']
     ordering_fields = ['prix', 'date_creation']
     ordering = ['-date_creation']
 
-
-    def get_queryset(self):
-        qs = super().get_queryset()
-        # Option 1 : TOUJOURS montrer TOUS les produits (simple pour ton dashboard)
-        return qs
-
     def get_queryset(self):
         user = self.request.user
-        if user.is_authenticated and getattr(user, 'role', None) == 'ADMIN':
-            return Produit.objects.all()  # Admin voit tout
-        elif user.is_authenticated and getattr(user, 'role', None) == 'VENDEUR':
-            return Produit.objects.filter(vendeur=user)  # Vendeur voit seulement les siens
-        else:
-            return Produit.objects.filter(approuve=True)  # Public voit seulement approuvés
+        if not user.is_authenticated:
+            return Produit.objects.filter(approuve=True)
+
+        if user.is_staff:
+            return Produit.objects.all()
+
+        if getattr(user, 'role', None) == 'VENDEUR':
+            return Produit.objects.filter(vendeur=user)
+
+        return Produit.objects.filter(approuve=True)
 
     def perform_create(self, serializer):
         user = self.request.user
-        if not user.is_authenticated:
-            raise PermissionDenied("Vous devez être connecté.")
-        user_role = getattr(user, 'role', None)
-        if user_role not in ['VENDEUR', 'ADMIN']:
-            raise PermissionDenied("Seuls les vendeurs ou admins peuvent ajouter des produits.")
-        if user_role == 'VENDEUR' and getattr(user, 'statut', None) != 'APPROVED':
-            raise PermissionDenied("Votre compte vendeur est en attente.")
+        if getattr(user, 'role', None) not in ['VENDEUR', 'ADMIN']:
+            raise PermissionDenied("Seuls les vendeurs ou admins peuvent créer des produits.")
+        
+        # Plus de check sur 'statut' → supprimé car champ inexistant
         serializer.save(vendeur=user)
 
-    # Nouvelle action : approuver un produit (seulement pour admins)
     @action(detail=True, methods=['post'], permission_classes=[permissions.IsAdminUser])
     def approve(self, request, pk=None):
         produit = self.get_object()
         produit.approuve = True
         produit.save()
-        return Response({'detail': f'Produit {produit} approuvé avec succès.'})
+        return Response({'detail': f'Produit {produit.titre} approuvé.'})

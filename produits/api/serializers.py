@@ -1,4 +1,3 @@
-# produits/api/serializers.py
 from rest_framework import serializers
 import json
 
@@ -15,9 +14,6 @@ class DecimalFlexibleField(serializers.DecimalField):
 
 
 class ProductImageSerializer(serializers.ModelSerializer):
-    """
-    IMPORTANT : on renvoie TOUJOURS une URL absolue
-    """
     image = serializers.SerializerMethodField()
 
     class Meta:
@@ -28,7 +24,6 @@ class ProductImageSerializer(serializers.ModelSerializer):
     def get_image(self, obj):
         request = self.context.get('request')
         if obj.image and hasattr(obj.image, 'url'):
-            # Renvoie une URL absolue[](http://localhost:8000/media/...)
             return request.build_absolute_uri(obj.image.url) if request else obj.image.url
         return None
 
@@ -46,13 +41,9 @@ class CategorieSerializer(serializers.ModelSerializer):
 
 
 class ProduitSerializer(serializers.ModelSerializer):
-    """
-    Serializer principal pour Produit (liste, détail, création, mise à jour)
-    """
     vendeur = UserSerializer(read_only=True)
     categorie = CategorieSerializer(read_only=True)
     
-    # Pour l'écriture de la catégorie (on accepte l'ID)
     categorie_id = serializers.PrimaryKeyRelatedField(
         queryset=Categorie.objects.all(),
         source='categorie',
@@ -61,42 +52,46 @@ class ProduitSerializer(serializers.ModelSerializer):
         allow_null=True
     )
 
-    # On utilise le serializer qui renvoie les URLs absolues
+    categorie_nom = serializers.CharField(
+        write_only=True,
+        required=False,
+        allow_blank=True
+    )
+
     images = ProductImageSerializer(many=True, read_only=True)
     variantes = ProductVariantSerializer(many=True, read_only=True)
 
     class Meta:
         model = Produit
         fields = [
-            'id',
-            'titre',
-            'description',
-            'prix',
-            'stock',
-            'poids',
-            'volume',
-            'approuve',
-            'date_creation',
-            'vendeur',
-            'categorie',
-            'categorie_id',
-            'images',
-            'variantes',
+            'id', 'titre', 'description', 'prix', 'stock', 'poids', 'volume',
+            'approuve', 'date_creation', 'vendeur', 'categorie',
+            'categorie_id', 'categorie_nom', 'images', 'variantes',
         ]
-        read_only_fields = [
-            'approuve',
-            'date_creation',
-            'vendeur',
-        ]
+        read_only_fields = ['date_creation', 'vendeur']
         extra_kwargs = {
             'titre': {'required': True},
             'description': {'required': False, 'allow_blank': True},
         }
 
+    def validate(self, data):
+        # Sécurité : les vendeurs ne peuvent pas s'auto-approuver
+        user = self.context['request'].user
+        if data.get('approuve') is True and not user.is_staff:
+            data['approuve'] = False
+        return data
+
     def create(self, validated_data):
-        """
-        Création d'un produit + gestion des images uploadées
-        """
+        categorie_nom = validated_data.pop('categorie_nom', None)
+        if categorie_nom and not validated_data.get('categorie'):
+            try:
+                categorie = Categorie.objects.get(nom__iexact=categorie_nom.strip())
+                validated_data['categorie'] = categorie
+            except Categorie.DoesNotExist:
+                raise serializers.ValidationError({
+                    "categorie": f"La catégorie '{categorie_nom}' n'existe pas."
+                })
+
         images_files = self.context['request'].FILES.getlist('images_files')
         images_meta_json = self.context['request'].data.get('images', '[]')
 
@@ -105,10 +100,8 @@ class ProduitSerializer(serializers.ModelSerializer):
         except json.JSONDecodeError:
             raise serializers.ValidationError({"images": "Format JSON invalide pour les métadonnées images"})
 
-        # Création du produit
         produit = super().create(validated_data)
 
-        # Gestion des images
         for idx, meta in enumerate(images_meta):
             if idx < len(images_files):
                 ProductImage.objects.create(
@@ -119,34 +112,3 @@ class ProduitSerializer(serializers.ModelSerializer):
                 )
 
         return produit
-
-    def update(self, instance, validated_data):
-        """
-        Mise à jour + remplacement complet des images si fourni
-        """
-        images_files = self.context['request'].FILES.getlist('images_files')
-        images_meta_json = self.context['request'].data.get('images')
-
-        # Mise à jour des champs classiques
-        instance = super().update(instance, validated_data)
-
-        # Si on envoie de nouvelles images ou métadonnées → on remplace tout
-        if images_files or images_meta_json is not None:
-            instance.images.all().delete()  # suppression complète
-
-            if images_meta_json:
-                try:
-                    images_meta = json.loads(images_meta_json)
-                except json.JSONDecodeError:
-                    raise serializers.ValidationError({"images": "Format JSON invalide"})
-
-                for idx, meta in enumerate(images_meta):
-                    if idx < len(images_files):
-                        ProductImage.objects.create(
-                            produit=instance,
-                            image=images_files[idx],
-                            alt_text=meta.get('alt_text', ''),
-                            ordre=meta.get('ordre', idx)
-                        )
-
-        return instance
