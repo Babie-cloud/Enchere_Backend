@@ -129,13 +129,13 @@ CORS_ALLOW_HEADERS = [                              # ← autorise le header Aut
 ]
 
 # ==================== EMAIL CONFIG ====================
-EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
-EMAIL_HOST = 'smtp.mailtrap.io'
-EMAIL_PORT = 2525
-EMAIL_HOST_USER = 'ton_vrai_username_mailtrap'
-EMAIL_HOST_PASSWORD = 'ton_vrai_password_mailtrap'
-EMAIL_USE_TLS = True
-DEFAULT_FROM_EMAIL = 'DirectAlu <no-reply@directalu.com>'
+# EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+# EMAIL_HOST = 'smtp.mailtrap.io'
+# EMAIL_PORT = 2525
+# EMAIL_HOST_USER = 'ton_vrai_username_mailtrap'
+# EMAIL_HOST_PASSWORD = 'ton_vrai_password_mailtrap'
+# EMAIL_USE_TLS = True
+# DEFAULT_FROM_EMAIL = 'DirectAlu <no-reply@directalu.com>'
 
 # ==================== DJOSER CONFIG ====================
 DJOSER = {
